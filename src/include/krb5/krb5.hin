@@ -441,6 +441,8 @@ typedef struct _krb5_crypto_iov {
 #define ENCTYPE_ARCFOUR_HMAC_EXP            0x0018 /**< RFC 4757 */
 #define ENCTYPE_CAMELLIA128_CTS_CMAC        0x0019 /**< RFC 6803 */
 #define ENCTYPE_CAMELLIA256_CTS_CMAC        0x001a /**< RFC 6803 */
+#define ENCTYPE_AES256_CTS_STRIBOG_256      0x001b /**< NO RFC */
+#define ENCTYPE_AES256_CTS_STRIBOG_512      0x001c /**< NO RFC */
 #define ENCTYPE_UNKNOWN                     0x01ff
 
 #define CKSUMTYPE_CRC32         0x0001
@@ -463,6 +465,9 @@ typedef struct _krb5_crypto_iov {
 #define CKSUMTYPE_CMAC_CAMELLIA256 0x0012 /**< RFC 6803 */
 #define CKSUMTYPE_MD5_HMAC_ARCFOUR -137 /* Microsoft netlogon */
 #define CKSUMTYPE_HMAC_MD5_ARCFOUR -138 /**< RFC 4757 */
+#define CKSUMTYPE_STRIBOG_256_AES256 -139 /**< SOME GOST */
+#define CKSUMTYPE_STRIBOG_512_AES256 -140 /**< SOME GOST */
+
 
 /*
  * The following are entropy source designations. Whenever

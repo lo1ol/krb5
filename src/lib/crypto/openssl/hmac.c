@@ -52,6 +52,7 @@
 
 
 #include "crypto_int.h"
+#include "gost_helper.h"
 #include <openssl/hmac.h>
 #include <openssl/evp.h>
 
@@ -107,6 +108,10 @@ map_digest(const struct krb5_hash_provider *hash)
         return EVP_md5();
     else if (!strncmp(hash->hash_name, "MD4", 3))
         return EVP_md4();
+    else if (!strncmp(hash->hash_name, "GOSTR34.11-2012-256", 19))
+        return EVP_gostR3411_2012_256();
+    else if (!strncmp(hash->hash_name, "GOSTR34.11-2012-512", 19))
+        return EVP_gostR3411_2012_512();
     else
         return NULL;
 }

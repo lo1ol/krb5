@@ -8,21 +8,24 @@ STLIBOBJS=\
 	init.o	\
 	pbkdf2.o \
 	sha256.o \
-	stubs.o
+	stubs.o \
+	gost_helper.o
 
 OBJS=\
 	$(OUTPRE)hmac.$(OBJEXT)	\
 	$(OUTPRE)init.$(OBJEXT)	\
 	$(OUTPRE)pbkdf2.$(OBJEXT) \
 	$(OUTPRE)sha256.$(OBJEXT) \
-	$(OUTPRE)stubs.$(OBJEXT)
+	$(OUTPRE)stubs.$(OBJEXT) \
+	$(OUTPRE)gost_helper$(OBJEXT)
 
 SRCS=\
 	$(srcdir)/hmac.c	\
 	$(srcdir)/init.c	\
 	$(srcdir)/pbkdf2.c	\
 	$(srcdir)/sha256.c	\
-	$(srcdir)/stubs.c
+	$(srcdir)/stubs.c	\
+	$(srcdir)/gost_helper.c
 
 STOBJLISTS= des/OBJS.ST md4/OBJS.ST 	\
 	md5/OBJS.ST sha1/OBJS.ST sha2/OBJS.ST 	\

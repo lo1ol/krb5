@@ -61,7 +61,7 @@ struct krb5_enc_provider {
 };
 
 struct krb5_hash_provider {
-    char hash_name[8];
+    char hash_name[32];
     size_t hashsize, blocksize;
 
     krb5_error_code (*hash)(const krb5_crypto_iov *data, size_t num_data,
@@ -457,6 +457,7 @@ extern const struct krb5_enc_provider krb5int_enc_aes128_ctr;
 extern const struct krb5_enc_provider krb5int_enc_aes256_ctr;
 extern const struct krb5_enc_provider krb5int_enc_camellia128;
 extern const struct krb5_enc_provider krb5int_enc_camellia256;
+extern const struct krb5_enc_provider krb5int_enc_gost89;
 
 extern const struct krb5_hash_provider krb5int_hash_crc32;
 extern const struct krb5_hash_provider krb5int_hash_md4;
@@ -464,6 +465,8 @@ extern const struct krb5_hash_provider krb5int_hash_md5;
 extern const struct krb5_hash_provider krb5int_hash_sha1;
 extern const struct krb5_hash_provider krb5int_hash_sha256;
 extern const struct krb5_hash_provider krb5int_hash_sha384;
+extern const struct krb5_hash_provider krb5int_hash_stribog256;
+extern const struct krb5_hash_provider krb5int_hash_stribog512;
 
 /* Modules must implement the following functions. */
 

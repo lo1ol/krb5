@@ -181,6 +181,7 @@ const struct krb5_keytypes krb5int_enctypes_list[] = {
       krb5int_aes2_prf,
       CKSUMTYPE_HMAC_SHA256_128_AES128,
       0 /*flags*/, 128 },
+
     { ENCTYPE_AES256_CTS_HMAC_SHA384_192,
       "aes256-cts-hmac-sha384-192", { "aes256-sha2" },
       "AES-256 CTS mode with 192-bit SHA-384 HMAC",
@@ -191,6 +192,29 @@ const struct krb5_keytypes krb5int_enctypes_list[] = {
       krb5int_aes2_prf,
       CKSUMTYPE_HMAC_SHA384_192_AES256,
       0 /*flags*/, 256 },
+
+    { ENCTYPE_AES256_CTS_STRIBOG_256,
+      "aes256-cts-stribog-256", { "aes256-stribog256" },
+      "AES-256 CTS mode with 256-bit stribog",
+      &krb5int_enc_aes256, &krb5int_hash_stribog256,
+      16,
+      krb5int_aes2_crypto_length, krb5int_etm_encrypt, krb5int_etm_decrypt,
+      krb5int_aes2_string_to_key, k5_rand2key_direct,
+      krb5int_aes2_prf,
+      CKSUMTYPE_STRIBOG_256_AES256,
+      0 /*flags*/, 256 },
+
+    { ENCTYPE_AES256_CTS_STRIBOG_512,
+      "aes256-cts-stribog-512", { "aes256-stribog512" },
+      "AES-256 CTS mode with 512-bit stribog",
+      &krb5int_enc_aes256, &krb5int_hash_stribog512,
+      16,
+      krb5int_aes2_crypto_length, krb5int_etm_encrypt, krb5int_etm_decrypt,
+      krb5int_aes2_string_to_key, k5_rand2key_direct,
+      krb5int_aes2_prf,
+      CKSUMTYPE_STRIBOG_512_AES256,
+      0 /*flags*/, 256 },
+
 };
 
 const int krb5int_enctypes_length =

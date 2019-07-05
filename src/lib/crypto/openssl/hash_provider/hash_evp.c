@@ -31,6 +31,7 @@
  */
 
 #include "crypto_int.h"
+#include "gost_helper.h"
 #include <openssl/evp.h>
 
 static krb5_error_code
@@ -91,6 +92,18 @@ hash_sha384(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
     return hash_evp(EVP_sha384(), data, num_data, output);
 }
 
+static krb5_error_code
+hash_stribog256(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
+{
+    return hash_evp(EVP_gostR3411_2012_256(), data, num_data, output);
+}
+
+static krb5_error_code
+hash_stribog512(const krb5_crypto_iov *data, size_t num_data, krb5_data *output)
+{
+    return hash_evp(EVP_gostR3411_2012_512(), data, num_data, output);
+}
+
 const struct krb5_hash_provider krb5int_hash_md4 = {
     "MD4", 16, 64, hash_md4
 };
@@ -109,4 +122,12 @@ const struct krb5_hash_provider krb5int_hash_sha256 = {
 
 const struct krb5_hash_provider krb5int_hash_sha384 = {
     "SHA-384", 48, 128, hash_sha384
+};
+
+const struct krb5_hash_provider krb5int_hash_stribog256 = {
+    "GOSTR34.11-2012-256", 32, 64, hash_stribog256
+};
+
+const struct krb5_hash_provider krb5int_hash_stribog512 = {
+    "GOSTR34.11-2012-512", 64, 64, hash_stribog512
 };
