@@ -56,46 +56,23 @@
 #include "gost_helper.h"
 #include <openssl/evp.h>
 
-#define GOST_BLOCK_SIZE 8
-#define GOST_KEY_SIZE 24
-#define GOST_KEY_BYTES 21
+#define BLOCK_SIZE 8
 
 static krb5_error_code
-validate(krb5_key key, const krb5_data *ivec, const krb5_crypto_iov *data,
-         size_t num_data, krb5_boolean *empty)
-{
-    size_t input_length = iov_total_length(data, num_data, FALSE);
-
-    if (key->keyblock.length != GOST_KEY_SIZE)
-        return(KRB5_BAD_KEYSIZE);
-    if ((input_length%GOST_BLOCK_SIZE) != 0)
-        return(KRB5_BAD_MSIZE);
-    if (ivec && (ivec->length != 8))
-        return(KRB5_BAD_MSIZE);
-
-    *empty = (input_length == 0);
-    return 0;
-}
-
-static krb5_error_code
-k5_gost_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+krb5int_gost_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
                 size_t num_data)
 {
-    int ret, olen = GOST_BLOCK_SIZE;
-    unsigned char iblock[GOST_BLOCK_SIZE], oblock[GOST_BLOCK_SIZE];
+    int ret, olen = BLOCK_SIZE;
+    unsigned char iblock[BLOCK_SIZE], oblock[BLOCK_SIZE];
     struct iov_cursor cursor;
     EVP_CIPHER_CTX *ctx;
-    krb5_boolean empty;
 
-    ret = validate(key, ivec, data, num_data, &empty);
-    if (ret != 0 || empty)
-        return ret;
-
+    krb5int_init_gost();
     ctx = EVP_CIPHER_CTX_new();
     if (ctx == NULL)
         return ENOMEM;
 
-    ret = EVP_EncryptInit_ex(ctx, EVP_des_ede3_cbc(), NULL,
+    ret = EVP_EncryptInit_ex(ctx, EVP_get_cipherbynid(NID_gost89_cbc), NULL,
                              key->keyblock.contents,
                              (ivec) ? (unsigned char*)ivec->data : NULL);
     if (!ret) {
@@ -105,16 +82,16 @@ k5_gost_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
 
     EVP_CIPHER_CTX_set_padding(ctx,0);
 
-    k5_iov_cursor_init(&cursor, data, num_data, GOST_BLOCK_SIZE, FALSE);
+    k5_iov_cursor_init(&cursor, data, num_data, BLOCK_SIZE, FALSE);
     while (k5_iov_cursor_get(&cursor, iblock)) {
-        ret = EVP_EncryptUpdate(ctx, oblock, &olen, iblock, GOST_BLOCK_SIZE);
+        ret = EVP_EncryptUpdate(ctx, oblock, &olen, iblock, BLOCK_SIZE);
         if (!ret)
             break;
         k5_iov_cursor_put(&cursor, oblock);
     }
 
     if (ivec != NULL)
-        memcpy(ivec->data, oblock, GOST_BLOCK_SIZE);
+        memcpy(ivec->data, oblock, BLOCK_SIZE);
 
     EVP_CIPHER_CTX_free(ctx);
 
@@ -127,24 +104,20 @@ k5_gost_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
 }
 
 static krb5_error_code
-k5_gost_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
+krb5int_gost_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
                 size_t num_data)
 {
-    int ret, olen = GOST_BLOCK_SIZE;
-    unsigned char iblock[GOST_BLOCK_SIZE], oblock[GOST_BLOCK_SIZE];
+    int ret, olen = BLOCK_SIZE;
+    unsigned char iblock[BLOCK_SIZE], oblock[BLOCK_SIZE];
     struct iov_cursor cursor;
     EVP_CIPHER_CTX *ctx;
-    krb5_boolean empty;
 
-    ret = validate(key, ivec, data, num_data, &empty);
-    if (ret != 0 || empty)
-        return ret;
-
+    krb5int_init_gost();
     ctx = EVP_CIPHER_CTX_new();
     if (ctx == NULL)
         return ENOMEM;
 
-    ret = EVP_DecryptInit_ex(ctx, EVP_des_ede3_cbc(), NULL,
+    ret = EVP_DecryptInit_ex(ctx, EVP_get_cipherbynid(NID_gost89_cbc), NULL,
                              key->keyblock.contents,
                              (ivec) ? (unsigned char*)ivec->data : NULL);
     if (!ret) {
@@ -154,17 +127,17 @@ k5_gost_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
 
     EVP_CIPHER_CTX_set_padding(ctx,0);
 
-    k5_iov_cursor_init(&cursor, data, num_data, GOST_BLOCK_SIZE, FALSE);
+    k5_iov_cursor_init(&cursor, data, num_data, BLOCK_SIZE, FALSE);
     while (k5_iov_cursor_get(&cursor, iblock)) {
         ret = EVP_DecryptUpdate(ctx, oblock, &olen,
-                                (unsigned char *)iblock, GOST_BLOCK_SIZE);
+                                (unsigned char *)iblock, BLOCK_SIZE);
         if (!ret)
             break;
         k5_iov_cursor_put(&cursor, oblock);
     }
 
     if (ivec != NULL)
-        memcpy(ivec->data, iblock, GOST_BLOCK_SIZE);
+        memcpy(ivec->data, iblock, BLOCK_SIZE);
 
     EVP_CIPHER_CTX_free(ctx);
 
@@ -180,7 +153,6 @@ static krb5_error_code
 krb5int_gost_init_state (const krb5_keyblock *key, krb5_keyusage usage,
                         krb5_data *state)
 {
-    krb5int_init_gost();
     state->length = 8;
     state->data = (void *) malloc(8);
     if (state->data == NULL)
@@ -194,14 +166,13 @@ krb5int_gost_free_state(krb5_data *state)
 {
     free(state->data);
     *state = empty_data();
-    krb5int_free_gost();
 }
 
 const struct krb5_enc_provider krb5int_enc_gost89 = {
-    GOST_BLOCK_SIZE,
-    GOST_KEY_BYTES, GOST_KEY_SIZE,
-    k5_gost_encrypt,
-    k5_gost_decrypt,
+    BLOCK_SIZE,
+    32, 32,
+    krb5int_gost_encrypt,
+    krb5int_gost_decrypt,
     NULL,
     krb5int_gost_init_state,
     krb5int_gost_free_state

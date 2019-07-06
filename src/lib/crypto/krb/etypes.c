@@ -215,6 +215,28 @@ const struct krb5_keytypes krb5int_enctypes_list[] = {
       CKSUMTYPE_STRIBOG_512_AES256,
       0 /*flags*/, 256 },
 
+     { ENCTYPE_GOST89_CBC_STRIBOG_256,
+       "gost89-cbc-stribog-256", { "gost89-stribog256" },
+       "GOST 28147-89 CBC mode with 256-bit stribog",
+       &krb5int_enc_gost89, &krb5int_hash_stribog256,
+       16,
+       krb5int_dk_crypto_length, krb5int_dk_encrypt, krb5int_dk_decrypt,
+       krb5int_dk_string_to_key, k5_rand2key_direct,
+       krb5int_dk_prf,
+       CKSUMTYPE_STRIBOG_256_GOST89,
+       0 /*flags*/, 256 },
+
+    { ENCTYPE_GOST89_CBC_STRIBOG_512,
+      "gost89-cbc-stribog-512", { "gost89-stribog512" },
+      "GOST 28147-89 CBC mode with 512-bit stribog",
+      &krb5int_enc_gost89, &krb5int_hash_stribog512,
+      16,
+      krb5int_dk_crypto_length, krb5int_dk_encrypt, krb5int_dk_decrypt,
+      krb5int_dk_string_to_key, k5_rand2key_direct,
+      krb5int_dk_prf,
+      CKSUMTYPE_STRIBOG_512_GOST89,
+      0 /*flags*/, 256 },
+
 };
 
 const int krb5int_enctypes_length =
