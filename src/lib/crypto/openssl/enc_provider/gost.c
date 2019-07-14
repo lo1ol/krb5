@@ -49,8 +49,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-// THIS ALGORITM IS FAKE!!!
-// DOESN'T USE IT
 
 #include "crypto_int.h"
 #include "gost_helper.h"
