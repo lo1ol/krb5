@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <arpa/inet.h>
+#include <openssl/engine.h>
 
 static krb5_error_code pkinit_init_pkinit_oids(pkinit_plg_crypto_context );
 static void pkinit_fini_pkinit_oids(pkinit_plg_crypto_context );
@@ -800,6 +801,24 @@ get_key_cb(char *buf, int size, int rwflag, void *userdata)
     return (int)rdat.length;
 }
 
+static ENGINE *eng = NULL;
+
+static void
+krb5int_init_gost()
+{
+    if (eng) return;
+    OPENSSL_add_all_algorithms_conf();
+    ERR_load_crypto_strings();
+
+    if (!(eng = ENGINE_by_id("gost"))) {
+        printf("Engine gost doesnt exist");
+        return;
+    }
+
+    ENGINE_init(eng);
+    ENGINE_set_default(eng, ENGINE_METHOD_ALL);
+}
+
 static krb5_error_code
 get_key(krb5_context context, pkinit_identity_crypto_context id_cryptoctx,
         char *filename, const char *fsname, EVP_PKEY **retkey,
@@ -810,6 +829,8 @@ get_key(krb5_context context, pkinit_identity_crypto_context id_cryptoctx,
     struct get_key_cb_data cb_data;
     int code;
     krb5_error_code retval;
+
+    krb5int_init_gost();
 
     if (filename == NULL || retkey == NULL)
         return EINVAL;
@@ -1120,7 +1141,65 @@ cleanup:
     return retval;
 }
 
+static int
+pkey_to_digest_nid(const EVP_PKEY* const pkey)
+{
+    switch (EVP_PKEY_id(pkey)) {
+    case NID_id_GostR3410_2012_256:
+        return NID_id_GostR3411_2012_256;
+    case NID_id_GostR3410_2012_512:
+        return NID_id_GostR3411_2012_512;
+    case NID_id_GostR3410_2001:
+        return NID_id_GostR3411_94;
+    default:
+        return NID_sha1;
+    }
+}
 
+static int
+get_digest_nid(const pkinit_identity_crypto_context idcryptctx)
+{
+    switch (NID_id_GostR3410_2012_256) {
+    case NID_id_GostR3410_2012_256:
+        return NID_id_GostR3411_2012_256;
+    case NID_id_GostR3410_2012_512:
+        return NID_id_GostR3411_2012_512;
+    case NID_id_GostR3410_2001:
+        return NID_id_GostR3411_94;
+    default:
+        return NID_sha1;
+    }
+}
+
+static int
+get_alg_nid(const pkinit_identity_crypto_context idcryptctx)
+{
+    switch (NID_id_GostR3410_2012_256) {
+    case NID_id_GostR3410_2012_256:
+        return NID_id_tc26_signwithdigest_gost3410_2012_256;
+    case NID_id_GostR3410_2012_512:
+        return NID_id_tc26_signwithdigest_gost3410_2012_512;
+    case NID_id_GostR3410_2001:
+        return NID_id_tc26_signwithdigest;
+    default:
+        return NID_sha1WithRSAEncryption;
+    }
+}
+
+static CK_MECHANISM_TYPE
+get_mech_type(const pkinit_identity_crypto_context idcryptctx)
+{
+    switch (NID_id_GostR3410_2012_256) {
+    case NID_id_GostR3410_2012_256:
+        return CKM_GOSTR3410_WITH_GOSTR3411_12_256;
+    case NID_id_GostR3410_2012_512:
+        return CKM_GOSTR3410_WITH_GOSTR3411_12_512;
+    case NID_id_GostR3410_2001:
+        return CKM_GOSTR3410_WITH_GOSTR3411;
+    default:
+        return CKM_RSA_PKCS;
+    }
+}
 
 krb5_error_code
 cms_signeddata_create(krb5_context context,
@@ -1237,7 +1316,8 @@ cms_signeddata_create(krb5_context context,
         /* will not fill-out EVP_PKEY because it's on the smartcard */
 
         /* Set digest algs */
-        p7si->digest_alg->algorithm = OBJ_nid2obj(NID_sha1);
+        p7si->digest_alg->algorithm = OBJ_nid2obj(
+                    get_digest_nid(id_cryptoctx));
 
         if (p7si->digest_alg->parameter != NULL)
             ASN1_TYPE_free(p7si->digest_alg->parameter);
@@ -1248,7 +1328,7 @@ cms_signeddata_create(krb5_context context,
         /* Set sig algs */
         if (p7si->digest_enc_alg->parameter != NULL)
             ASN1_TYPE_free(p7si->digest_enc_alg->parameter);
-        p7si->digest_enc_alg->algorithm = OBJ_nid2obj(NID_sha1WithRSAEncryption);
+        p7si->digest_enc_alg->algorithm = OBJ_nid2obj(get_alg_nid(id_cryptoctx));
         if (!(p7si->digest_enc_alg->parameter = ASN1_TYPE_new()))
             goto cleanup;
         p7si->digest_enc_alg->parameter->type = V_ASN1_NULL;
@@ -1263,7 +1343,7 @@ cms_signeddata_create(krb5_context context,
             ctx = EVP_MD_CTX_new();
             if (ctx == NULL)
                 goto cleanup;
-            EVP_DigestInit_ex(ctx, EVP_sha1(), NULL);
+            EVP_DigestInit_ex(ctx, EVP_get_digestbynid(get_digest_nid(id_cryptoctx)), NULL);
             EVP_DigestUpdate(ctx, data, data_len);
             md_tmp = EVP_MD_CTX_md(ctx);
             EVP_DigestFinal_ex(ctx, md_data, &md_len);
@@ -1285,7 +1365,7 @@ cms_signeddata_create(krb5_context context,
             /* create the signature over signed attributes. get DER encoded value */
             /* This is the place where smartcard signature needs to be calculated */
             sk = p7si->auth_attr;
-            alen = ASN1_item_i2d((ASN1_VALUE *) sk, &abuf,
+            alen = (unsigned int )ASN1_item_i2d((ASN1_VALUE *) sk, &abuf,
                                  ASN1_ITEM_rptr(PKCS7_ATTR_SIGN));
             if (abuf == NULL)
                 goto cleanup2;
@@ -1707,6 +1787,8 @@ cms_signeddata_verify(krb5_context context,
             flags |= CMS_NOATTR;
         if (CMS_verify(cms, NULL, store, NULL, out, flags) == 0) {
             unsigned long err = ERR_peek_error();
+            err = ERR_get_error();
+            ERR_error_string(err, buf);
             switch(ERR_GET_REASON(err)) {
             case PKCS7_R_DIGEST_FAILURE:
                 retval = KRB5KDC_ERR_DIGEST_IN_SIGNED_DATA_NOT_ACCEPTED;
@@ -3004,6 +3086,7 @@ pkinit_openssl_init()
     /* Initialize OpenSSL. */
     ERR_load_crypto_strings();
     OpenSSL_add_all_algorithms();
+    krb5int_init_gost();
     return 0;
 }
 
@@ -3942,11 +4025,11 @@ pkinit_find_private_key(pkinit_identity_crypto_context id_cryptoctx,
     nattrs++;
 #endif
 
-    keytype = CKK_RSA;
-    attrs[nattrs].type = CKA_KEY_TYPE;
-    attrs[nattrs].pValue = &keytype;
-    attrs[nattrs].ulValueLen = sizeof keytype;
-    nattrs++;
+//    keytype = CKK_RSA;
+//    attrs[nattrs].type = CKA_KEY_TYPE;
+//    attrs[nattrs].pValue = &keytype;
+//    attrs[nattrs].ulValueLen = sizeof keytype;
+//    nattrs++;
 
     attrs[nattrs].type = CKA_ID;
     attrs[nattrs].pValue = id_cryptoctx->cert_id;
@@ -4137,9 +4220,11 @@ pkinit_sign_data_pkcs11(krb5_context context,
                         unsigned int *sig_len)
 {
     CK_OBJECT_HANDLE obj;
-    CK_ULONG len;
+    CK_ULONG len = 0;
     CK_MECHANISM mech;
+//    CK_ATTRIBUTE attrs[1];
     unsigned char *cp;
+    char buf[256];
     int r;
 
     if (pkinit_open_session(context, id_cryptoctx)) {
@@ -4147,7 +4232,18 @@ pkinit_sign_data_pkcs11(krb5_context context,
         return KRB5KDC_ERR_PREAUTH_FAILED;
     }
 
-    pkinit_find_private_key(id_cryptoctx, CKA_SIGN, &obj);
+    if (pkinit_find_private_key(id_cryptoctx, CKA_SIGN, &obj)) {
+        return KRB5KDC_ERR_PREAUTH_FAILED;
+    }
+
+//    attrs[0].type = CKA_LABEL;
+//    attrs[0].pValue = buf;
+//    attrs[0].ulValueLen = sizeof(buf);
+
+//    if ((r = id_cryptoctx->p11->C_GetAttributeValue(id_cryptoctx->session,
+//                                                    obj, attrs, 1)) != CKR_OK) {
+//        pkiDebug("C_GetAttributeValue: %s\n Used RSA\n", pkinit_pkcs11_code_to_text(r));
+//    }
 
     mech.mechanism = id_cryptoctx->mech;
     mech.pParameter = NULL;
@@ -4163,20 +4259,18 @@ pkinit_sign_data_pkcs11(krb5_context context,
      * Key len would give an upper bound on sig size, but there's no way to
      * get that. So guess, and if it's too small, re-malloc.
      */
-    len = PK_SIGLEN_GUESS;
+
+    r = id_cryptoctx->p11->C_Sign(id_cryptoctx->session, data,
+                                  (CK_ULONG) data_len, NULL, &len);
+
     cp = malloc((size_t) len);
     if (cp == NULL)
         return ENOMEM;
+    memset(cp, 0, len * sizeof(CK_BYTE));
 
     r = id_cryptoctx->p11->C_Sign(id_cryptoctx->session, data,
                                   (CK_ULONG) data_len, cp, &len);
-    if (r == CKR_BUFFER_TOO_SMALL || (r == CKR_OK && len >= PK_SIGLEN_GUESS)) {
-        free(cp);
-        pkiDebug("C_Sign realloc %d\n", (int) len);
-        cp = malloc((size_t) len);
-        r = id_cryptoctx->p11->C_Sign(id_cryptoctx->session, data,
-                                      (CK_ULONG) data_len, cp, &len);
-    }
+
     if (r != CKR_OK) {
         pkiDebug("C_Sign: %s\n", pkinit_pkcs11_code_to_text(r));
         return KRB5KDC_ERR_PREAUTH_FAILED;
@@ -4218,14 +4312,17 @@ create_signature(unsigned char **sig, unsigned int *sig_len,
 {
     krb5_error_code retval = ENOMEM;
     EVP_MD_CTX *ctx;
+    int type;
 
+    type = EVP_PKEY_base_id(pkey);
+    type = EVP_PKEY_id(pkey);
     if (pkey == NULL)
         return retval;
 
     ctx = EVP_MD_CTX_new();
     if (ctx == NULL)
         return ENOMEM;
-    EVP_SignInit(ctx, EVP_sha1());
+    EVP_SignInit(ctx, EVP_get_digestbynid(pkey_to_digest_nid(pkey)));
     EVP_SignUpdate(ctx, data, data_len);
     *sig_len = EVP_PKEY_size(pkey);
     if ((*sig = malloc(*sig_len)) == NULL)
@@ -4782,7 +4879,7 @@ pkinit_get_certs_pkcs11(krb5_context context,
             break;
         }
 
-        /* Get cert and id len */
+        /* Get cert and id len and mech_type*/
         attrs[0].type = CKA_VALUE;
         attrs[0].pValue = NULL;
         attrs[0].ulValueLen = 0;
@@ -4796,6 +4893,7 @@ pkinit_get_certs_pkcs11(krb5_context context,
             pkiDebug("C_GetAttributeValue: %s\n", pkinit_pkcs11_code_to_text(r));
             return KRB5KDC_ERR_PREAUTH_FAILED;
         }
+
         cert = (CK_BYTE_PTR) malloc((size_t) attrs[0].ulValueLen + 1);
         cert_id = (CK_BYTE_PTR) malloc((size_t) attrs[1].ulValueLen + 1);
         if (cert == NULL || cert_id == NULL)
@@ -4833,6 +4931,9 @@ pkinit_get_certs_pkcs11(krb5_context context,
         id_cryptoctx->creds[i]->cert_id_len = attrs[1].ulValueLen;
         free(cert);
     }
+
+    id_cryptoctx->mech = get_mech_type(id_cryptoctx);
+
     id_cryptoctx->p11->C_FindObjectsFinal(id_cryptoctx->session);
     if (cert == NULL)
         return KRB5KDC_ERR_PREAUTH_FAILED;

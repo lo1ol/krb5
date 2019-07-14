@@ -19,14 +19,6 @@ krb5int_init_gost()
     ENGINE_set_default(eng, ENGINE_METHOD_ALL);
 }
 
-void
-krb5int_free_gost()
-{
-    // We don't free gost engine, because it has no propper interface
-    // ENGINE_finish(eng);
-    // ENGINE_free(eng);
-}
-
 const EVP_MD *
 EVP_gostR3411_2012_256()
 {

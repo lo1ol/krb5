@@ -398,6 +398,8 @@ krb5_error_code krb5int_des_init_state(const krb5_keyblock *key,
                                        krb5_keyusage keyusage,
                                        krb5_data *state_out);
 
+void krb5int_init_gost();
+
 /* Default state cleanup handler (used by module enc providers). */
 void krb5int_default_free_state(krb5_data *state);
 
